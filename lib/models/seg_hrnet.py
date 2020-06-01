@@ -10,10 +10,8 @@ from __future__ import print_function
 
 import os
 import logging
-import functools
 
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch._utils
@@ -22,6 +20,7 @@ import torch.nn.functional as F
 BatchNorm2d = nn.BatchNorm2d
 BN_MOMENTUM = 0.01
 logger = logging.getLogger(__name__)
+
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -120,7 +119,8 @@ class HighResolutionModule(nn.Module):
         self.fuse_layers = self._make_fuse_layers()
         self.relu = nn.ReLU(inplace=True)
 
-    def _check_branches(self, num_branches, blocks, num_blocks,
+    @staticmethod
+    def _check_branches(num_branches, blocks, num_blocks,
                         num_inchannels, num_channels):
         if num_branches != len(num_blocks):
             error_msg = 'NUM_BRANCHES({}) <> NUM_BLOCKS({})'.format(
@@ -144,7 +144,7 @@ class HighResolutionModule(nn.Module):
                          stride=1):
         downsample = None
         if stride != 1 or \
-           self.num_inchannels[branch_index] != num_channels[branch_index] * block.expansion:
+                self.num_inchannels[branch_index] != num_channels[branch_index] * block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(self.num_inchannels[branch_index],
                           num_channels[branch_index] * block.expansion,
@@ -153,7 +153,7 @@ class HighResolutionModule(nn.Module):
                             momentum=BN_MOMENTUM),
             )
 
-        layers = []
+        layers = list()
         layers.append(block(self.num_inchannels[branch_index],
                             num_channels[branch_index], stride, downsample))
         self.num_inchannels[branch_index] = \
@@ -165,7 +165,7 @@ class HighResolutionModule(nn.Module):
         return nn.Sequential(*layers)
 
     def _make_branches(self, num_branches, block, num_blocks, num_channels):
-        branches = []
+        branches = list()
 
         for i in range(num_branches):
             branches.append(
@@ -179,9 +179,9 @@ class HighResolutionModule(nn.Module):
 
         num_branches = self.num_branches
         num_inchannels = self.num_inchannels
-        fuse_layers = []
+        fuse_layers = list()
         for i in range(num_branches if self.multi_scale_output else 1):
-            fuse_layer = []
+            fuse_layer = list()
             for j in range(num_branches):
                 if j > i:
                     fuse_layer.append(nn.Sequential(
@@ -195,15 +195,15 @@ class HighResolutionModule(nn.Module):
                 elif j == i:
                     fuse_layer.append(None)
                 else:
-                    conv3x3s = []
-                    for k in range(i-j):
+                    conv3x3s = list()
+                    for k in range(i - j):
                         if k == i - j - 1:
                             num_outchannels_conv3x3 = num_inchannels[i]
                             conv3x3s.append(nn.Sequential(
                                 nn.Conv2d(num_inchannels[j],
                                           num_outchannels_conv3x3,
                                           3, 2, 1, bias=False),
-                                BatchNorm2d(num_outchannels_conv3x3, 
+                                BatchNorm2d(num_outchannels_conv3x3,
                                             momentum=BN_MOMENTUM)))
                         else:
                             num_outchannels_conv3x3 = num_inchannels[j]
@@ -229,7 +229,7 @@ class HighResolutionModule(nn.Module):
         for i in range(self.num_branches):
             x[i] = self.branches[i](x[i])
 
-        x_fuse = []
+        x_fuse = list()
         for i in range(len(self.fuse_layers)):
             y = x[0] if i == 0 else self.fuse_layers[i][0](x[0])
             for j in range(1, self.num_branches):
@@ -241,7 +241,8 @@ class HighResolutionModule(nn.Module):
                     y = y + F.interpolate(
                         self.fuse_layers[i][j](x[j]),
                         size=[height_output, width_output],
-                        mode='bilinear')
+                        mode='bilinear',
+                        align_corners=True)
                 else:
                     y = y + self.fuse_layers[i][j](x[j])
             x_fuse.append(self.relu(y))
@@ -269,13 +270,13 @@ class HighResolutionNet(nn.Module):
                                bias=False)
         self.bn2 = BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=True)
-        
+
         self.stage1_cfg = extra['STAGE1']
         num_channels = self.stage1_cfg['NUM_CHANNELS'][0]
         block = blocks_dict[self.stage1_cfg['BLOCK']]
         num_blocks = self.stage1_cfg['NUM_BLOCKS'][0]
         self.layer1 = self._make_layer(block, 64, num_channels, num_blocks)
-        stage1_out_channel = block.expansion*num_channels
+        stage1_out_channel = block.expansion * num_channels
 
         self.stage2_cfg = extra['STAGE2']
         num_channels = self.stage2_cfg['NUM_CHANNELS']
@@ -306,7 +307,7 @@ class HighResolutionNet(nn.Module):
             pre_stage_channels, num_channels)
         self.stage4, pre_stage_channels = self._make_stage(
             self.stage4_cfg, num_channels, multi_scale_output=True)
-        
+
         last_inp_channels = np.int(np.sum(pre_stage_channels))
 
         self.last_layer = nn.Sequential(
@@ -326,12 +327,12 @@ class HighResolutionNet(nn.Module):
                 padding=1 if extra.FINAL_CONV_KERNEL == 3 else 0)
         )
 
-    def _make_transition_layer(
-            self, num_channels_pre_layer, num_channels_cur_layer):
+    @staticmethod
+    def _make_transition_layer(num_channels_pre_layer, num_channels_cur_layer):
         num_branches_cur = len(num_channels_cur_layer)
         num_branches_pre = len(num_channels_pre_layer)
 
-        transition_layers = []
+        transition_layers = list()
         for i in range(num_branches_cur):
             if i < num_branches_pre:
                 if num_channels_cur_layer[i] != num_channels_pre_layer[i]:
@@ -348,11 +349,11 @@ class HighResolutionNet(nn.Module):
                 else:
                     transition_layers.append(None)
             else:
-                conv3x3s = []
-                for j in range(i+1-num_branches_pre):
+                conv3x3s = list()
+                for j in range(i + 1 - num_branches_pre):
                     inchannels = num_channels_pre_layer[-1]
                     outchannels = num_channels_cur_layer[i] \
-                        if j == i-num_branches_pre else inchannels
+                        if j == i - num_branches_pre else inchannels
                     conv3x3s.append(nn.Sequential(
                         nn.Conv2d(
                             inchannels, outchannels, 3, 2, 1, bias=False),
@@ -362,7 +363,8 @@ class HighResolutionNet(nn.Module):
 
         return nn.ModuleList(transition_layers)
 
-    def _make_layer(self, block, inplanes, planes, blocks, stride=1):
+    @staticmethod
+    def _make_layer(block, inplanes, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or inplanes != planes * block.expansion:
             downsample = nn.Sequential(
@@ -371,7 +373,7 @@ class HighResolutionNet(nn.Module):
                 BatchNorm2d(planes * block.expansion, momentum=BN_MOMENTUM),
             )
 
-        layers = []
+        layers = list()
         layers.append(block(inplanes, planes, stride, downsample))
         inplanes = planes * block.expansion
         for i in range(1, blocks):
@@ -379,7 +381,8 @@ class HighResolutionNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _make_stage(self, layer_config, num_inchannels,
+    @staticmethod
+    def _make_stage(layer_config, num_inchannels,
                     multi_scale_output=True):
         num_modules = layer_config['NUM_MODULES']
         num_branches = layer_config['NUM_BRANCHES']
@@ -388,7 +391,7 @@ class HighResolutionNet(nn.Module):
         block = blocks_dict[layer_config['BLOCK']]
         fuse_method = layer_config['FUSE_METHOD']
 
-        modules = []
+        modules = list()
         for i in range(num_modules):
             # multi_scale_output is only used last module
             if not multi_scale_output and i == num_modules - 1:
@@ -397,12 +400,12 @@ class HighResolutionNet(nn.Module):
                 reset_multi_scale_output = True
             modules.append(
                 HighResolutionModule(num_branches,
-                                      block,
-                                      num_blocks,
-                                      num_inchannels,
-                                      num_channels,
-                                      fuse_method,
-                                      reset_multi_scale_output)
+                                     block,
+                                     num_blocks,
+                                     num_inchannels,
+                                     num_channels,
+                                     fuse_method,
+                                     reset_multi_scale_output)
             )
             num_inchannels = modules[-1].get_num_inchannels()
 
@@ -417,7 +420,7 @@ class HighResolutionNet(nn.Module):
         x = self.relu(x)
         x = self.layer1(x)
 
-        x_list = []
+        x_list = list()
         for i in range(self.stage2_cfg['NUM_BRANCHES']):
             if self.transition1[i] is not None:
                 x_list.append(self.transition1[i](x))
@@ -425,7 +428,7 @@ class HighResolutionNet(nn.Module):
                 x_list.append(x)
         y_list = self.stage2(x_list)
 
-        x_list = []
+        x_list = list()
         for i in range(self.stage3_cfg['NUM_BRANCHES']):
             if self.transition2[i] is not None:
                 x_list.append(self.transition2[i](y_list[-1]))
@@ -433,7 +436,7 @@ class HighResolutionNet(nn.Module):
                 x_list.append(y_list[i])
         y_list = self.stage3(x_list)
 
-        x_list = []
+        x_list = list()
         for i in range(self.stage4_cfg['NUM_BRANCHES']):
             if self.transition3[i] is not None:
                 x_list.append(self.transition3[i](y_list[-1]))
@@ -443,9 +446,9 @@ class HighResolutionNet(nn.Module):
 
         # Upsampling
         x0_h, x0_w = x[0].size(2), x[0].size(3)
-        x1 = F.upsample(x[1], size=(x0_h, x0_w), mode='bilinear')
-        x2 = F.upsample(x[2], size=(x0_h, x0_w), mode='bilinear')
-        x3 = F.upsample(x[3], size=(x0_h, x0_w), mode='bilinear')
+        x1 = F.interpolate(x[1], size=(x0_h, x0_w), mode='bilinear', align_corners=True)
+        x2 = F.interpolate(x[2], size=(x0_h, x0_w), mode='bilinear', align_corners=True)
+        x3 = F.interpolate(x[3], size=(x0_h, x0_w), mode='bilinear', align_corners=True)
 
         x = torch.cat([x[0], x1, x2, x3], 1)
 
@@ -453,7 +456,7 @@ class HighResolutionNet(nn.Module):
 
         return x
 
-    def init_weights(self, pretrained='',):
+    def init_weights(self, pretrained=''):
         logger.info('=> init weights from normal distribution')
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -463,18 +466,21 @@ class HighResolutionNet(nn.Module):
                 nn.init.constant_(m.bias, 0)
         if os.path.isfile(pretrained):
             pretrained_dict = torch.load(pretrained)
-            logger.info('=> loading pretrained model {}'.format(pretrained))
+            if 'state_dict' in pretrained_dict:
+                pretrained_dict = pretrained_dict['state_dict']
             model_dict = self.state_dict()
-            pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                               if k in model_dict.keys()}
-            #for k, _ in pretrained_dict.items():
-            #    logger.info(
-            #        '=> loading {} pretrained model {}'.format(k, pretrained))
+            pretrained_dict = {k[6:]: v for k, v in pretrained_dict.items()
+                               if k[6:] in model_dict.keys()}
             model_dict.update(pretrained_dict)
             self.load_state_dict(model_dict)
+
 
 def get_seg_model(cfg, **kwargs):
     model = HighResolutionNet(cfg, **kwargs)
     model.init_weights(cfg.MODEL.PRETRAINED)
+    return model
 
+
+def hrnet(cfg, **kwargs):
+    model = HighResolutionNet(cfg, **kwargs)
     return model
