@@ -1,4 +1,4 @@
-# High-resolution networks (HRNets) for Semantic Segmentation
+# [High-resolution networks (HRNets) for Semantic Segmentation](https://github.com/HRNet/HRNet-Semantic-Segmentation)
 
 ## Branches
 - This is the implementation for PyTroch 0.4.1.
