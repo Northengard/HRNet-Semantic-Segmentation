@@ -5,6 +5,14 @@
 - The HRNet + OCR version ia available [here](https://github.com/HRNet/HRNet-Semantic-Segmentation/tree/HRNet-OCR).
 - The PyTroch 0.4.1 version is available [here](https://github.com/HRNet/HRNet-Semantic-Segmentation/tree/master).
 
+##### How to run inference script:
+- downdload weights of pretrained models
+- create yaml config file suitable model, that you have chosen (follow conf.yaml as an example)
+- enter the your video and weights path to the config
+- run "run_on_video.py" script
+
+Installation guide and run command examples are available below.
+
 ## News
 - [2020/03/13] Our paper is accepted by TPAMI: [Deep High-Resolution Representation Learning for Visual Recognition](https://arxiv.org/pdf/1908.07919.pdf).
 - HRNet + OCR + SegFix: Rank \#1 (84.5) in [Cityscapes leaderboard](https://www.cityscapes-dataset.com/benchmarks/). OCR: object contextual represenations [pdf](https://arxiv.org/pdf/1909.11065.pdf). ***HRNet + OCR is reproduced [here](https://github.com/HRNet/HRNet-Semantic-Segmentation/tree/HRNet-OCR)***.
