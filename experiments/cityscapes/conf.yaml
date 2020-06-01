@@ -96,9 +96,8 @@ TEST:
   - 2048
   - 1024
   BASE_SIZE: 2048
-  VIDEO_DIR: '/home/dgorbunov/Downloads/leftImg8bit_blurred/demoVideo/stuttgart_00'
-#  VIDEO_DIR: '/home/dgorbunov/Downloads/Stock_Footage_Driving_Rear_POV_HD.mp4'
-  VIDEO_IS_SEQUENCE: true
+#  VIDEO_DIR: '/home/dgorbunov/Downloads/leftImg8bit_blurred/demoVideo/stuttgart_00'
+  VIDEO_DIR: '/home/dgorbunov/Downloads/Stock_Footage_Driving_Rear_POV_HD.mp4'
   MODEL_FILE: '/home/dgorbunov/Documents/gits/HRNet-Semantic-Segmentation/pretrained/hrnet_w18_small_v2_cityscapes_cls19_1024x2048_trainset.pth'
   BATCH_SIZE_PER_GPU: 1
   FLIP_TEST: false
